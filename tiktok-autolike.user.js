@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.3
+// @version      1.1.4
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -729,6 +729,12 @@
     saveSettings({ manualValue: true, value: clampFloat(valueInput.value, 1, 1000000) });
   }
 
+  function handleCloseIntent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    closePanel();
+  }
+
   dragHandle.addEventListener('mousedown', function (event) {
     if (event.button !== 0 || event.target.closest('.tt-header-controls')) {
       return;
@@ -856,7 +862,8 @@
   startButton.addEventListener('click', startRun);
   pauseButton.addEventListener('click', pauseRun);
   stopButton.addEventListener('click', stopRun);
-  closeButton.addEventListener('click', closePanel);
+  closeButton.addEventListener('mousedown', handleCloseIntent);
+  closeButton.addEventListener('click', handleCloseIntent);
 
   const mountPoint = document.body || document.documentElement;
   mountPoint.appendChild(panel);
