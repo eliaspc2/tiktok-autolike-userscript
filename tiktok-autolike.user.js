@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.1
+// @version      1.1.2
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -41,6 +41,7 @@
     value: MODE_DEFAULT_VALUES.c,
     speed: 30,
     manualValue: false,
+    panelHidden: false,
     top: DEFAULT_PANEL_POSITION.top,
     left: null,
     launcherTop: DEFAULT_LAUNCHER_POSITION.top,
@@ -100,6 +101,7 @@
           : MODE_DEFAULT_VALUES[mode],
         speed: Number.isFinite(parsed.speed) ? parsed.speed : DEFAULTS.speed,
         manualValue,
+        panelHidden: Boolean(parsed.panelHidden),
         top: Number.isFinite(parsed.top) ? parsed.top : DEFAULTS.top,
         left: Number.isFinite(parsed.left) ? parsed.left : DEFAULTS.left,
         launcherTop: Number.isFinite(parsed.launcherTop) ? parsed.launcherTop : DEFAULTS.launcherTop,
@@ -569,14 +571,22 @@
     setSpeed(saved.speed);
   }
 
-  function showPanel() {
+  function showPanel(options = {}) {
+    const { persist = true } = options;
     panel.style.display = '';
     launcher.style.display = 'none';
+    if (persist) {
+      saveSettings({ panelHidden: false });
+    }
   }
 
-  function hidePanel() {
+  function hidePanel(options = {}) {
+    const { persist = true } = options;
     panel.style.display = 'none';
     launcher.style.display = 'flex';
+    if (persist) {
+      saveSettings({ panelHidden: true });
+    }
   }
 
   function startRun() {
@@ -817,14 +827,17 @@
   stopButton.addEventListener('click', stopRun);
   closeButton.addEventListener('click', closePanel);
 
+  const mountPoint = document.body || document.documentElement;
+  mountPoint.appendChild(panel);
+  mountPoint.appendChild(launcher);
   applySavedPosition();
   applySavedLauncherPosition();
   applySavedControls();
   setStatus('idle');
-
-  const mountPoint = document.body || document.documentElement;
-  mountPoint.appendChild(panel);
-  mountPoint.appendChild(launcher);
   window.ttAutoLikePanel = panel;
-  showPanel();
+  if (saved.panelHidden) {
+    hidePanel({ persist: false });
+  } else {
+    showPanel({ persist: false });
+  }
 })();
