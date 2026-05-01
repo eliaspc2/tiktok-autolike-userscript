@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.4
+// @version      1.1.6
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -248,11 +248,11 @@
     '  justify-content: space-between;',
     '  gap: 12px;',
     '  padding: 12px 14px;',
-    '  cursor: move;',
+    '  position: relative;',
     '  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(59, 130, 246, 0.16));',
     '  border-bottom: 1px solid rgba(255, 255, 255, 0.08);',
     '}',
-    `#${PANEL_ID} .tt-header-copy { min-width: 0; }`,
+    `#${PANEL_ID} .tt-header-copy { min-width: 0; cursor: move; }`,
     `#${PANEL_ID} .tt-header-controls {`,
     '  display: inline-flex;',
     '  align-items: flex-start;',
@@ -294,6 +294,9 @@
     '  font-weight: 700;',
     '  line-height: 1;',
     '  cursor: pointer;',
+    '  position: absolute;',
+    '  top: 10px;',
+    '  right: 10px;',
     '}',
     `#${PANEL_ID} .tt-icon-button:hover {`,
     '  background: rgba(239, 68, 68, 0.16);',
@@ -409,8 +412,8 @@
     '    </div>',
     '    <div class="tt-header-controls">',
     '      <div class="tt-pill" id="tt-status">Idle</div>',
-    '      <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '    </div>',
+    '    <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '  </div>',
     '  <div class="tt-body">',
     `    <input id="tt-value" class="tt-field" type="number" value="${MODE_DEFAULT_VALUES.c}" min="1" step="1" />`,
@@ -562,6 +565,58 @@
     const top = Math.round(launcher.getBoundingClientRect().top);
     const left = Math.round(launcher.getBoundingClientRect().left);
     saveSettings({ launcherTop: top, launcherLeft: left });
+  }
+
+  function activateSound() {
+    const videos = Array.from(document.querySelectorAll('video'));
+    let activated = false;
+
+    videos.forEach((video) => {
+      try {
+        video.muted = false;
+        video.volume = 1;
+        video.removeAttribute('muted');
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => {});
+        }
+        activated = true;
+      } catch (err) {
+        // Ignore and continue trying other players.
+      }
+    });
+
+    const soundButton = Array.from(
+      document.querySelectorAll('button, div[role="button"], span[role="button"]'),
+    ).find((el) => {
+      const label = getLabel(el).toLowerCase();
+      return /unmute|mute|sound|som|audio|volume/.test(label);
+    });
+
+    if (soundButton && typeof soundButton.click === 'function') {
+      try {
+        soundButton.click();
+        activated = true;
+      } catch (err) {
+        // Ignore if the site blocks synthetic clicks.
+      }
+    }
+
+    return activated;
+  }
+
+  function activateSoundAtStartup() {
+    if (activateSound()) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      activateSound();
+    }, 400);
+
+    window.setTimeout(() => {
+      activateSound();
+    }, 1200);
   }
 
   function applySavedPosition() {
@@ -736,7 +791,7 @@
   }
 
   dragHandle.addEventListener('mousedown', function (event) {
-    if (event.button !== 0 || event.target.closest('.tt-header-controls')) {
+    if (event.button !== 0) {
       return;
     }
 
@@ -862,12 +917,14 @@
   startButton.addEventListener('click', startRun);
   pauseButton.addEventListener('click', pauseRun);
   stopButton.addEventListener('click', stopRun);
+  closeButton.addEventListener('pointerdown', handleCloseIntent);
   closeButton.addEventListener('mousedown', handleCloseIntent);
   closeButton.addEventListener('click', handleCloseIntent);
 
   const mountPoint = document.body || document.documentElement;
   mountPoint.appendChild(panel);
   mountPoint.appendChild(launcher);
+  activateSoundAtStartup();
   applySavedPosition();
   applySavedLauncherPosition();
   applySavedControls();
