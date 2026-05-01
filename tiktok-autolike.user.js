@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.7
+// @version      1.1.8
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -569,56 +569,65 @@
     saveSettings({ launcherTop: top, launcherLeft: left });
   }
 
-  function activateSound() {
-    const videos = Array.from(document.querySelectorAll('video'));
-    let activated = false;
+  function hasReadyVideo() {
+    const video = document.querySelector('video');
+    return Boolean(video && video.readyState >= 2);
+  }
 
-    videos.forEach((video) => {
-      try {
-        video.muted = false;
-        video.volume = 1;
-        video.removeAttribute('muted');
-        const playPromise = video.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch(() => {});
-        }
-        activated = true;
-      } catch (err) {
-        // Ignore and continue trying other players.
-      }
+  function createMuteShortcutEvent() {
+    const event = new KeyboardEvent('keydown', {
+      key: 'm',
+      code: 'KeyM',
+      bubbles: true,
+      cancelable: true,
+      composed: true,
     });
 
-    const soundButton = Array.from(
-      document.querySelectorAll('button, div[role="button"], span[role="button"]'),
-    ).find((el) => {
-      const label = getLabel(el).toLowerCase();
-      return /unmute|mute|sound|som|audio|volume/.test(label);
-    });
-
-    if (soundButton && typeof soundButton.click === 'function') {
-      try {
-        soundButton.click();
-        activated = true;
-      } catch (err) {
-        // Ignore if the site blocks synthetic clicks.
-      }
+    try {
+      Object.defineProperties(event, {
+        keyCode: { get: () => 77 },
+        which: { get: () => 77 },
+        charCode: { get: () => 0 },
+      });
+    } catch (err) {
+      // Ignore if the browser refuses to redefine legacy key fields.
     }
 
-    return activated;
+    return event;
+  }
+
+  function activateSound() {
+    if (!hasReadyVideo()) {
+      return false;
+    }
+
+    const target = document.body || document.documentElement || document;
+    try {
+      target.dispatchEvent(createMuteShortcutEvent());
+      return true;
+    } catch (err) {
+      return false;
+    }
   }
 
   function activateSoundAtStartup() {
-    if (activateSound()) {
-      return;
+    const startTime = Date.now();
+    const initialDelay = 1000;
+    const retryDelay = 600;
+    const maxWait = 15000;
+
+    function attempt() {
+      if (activateSound()) {
+        return;
+      }
+
+      if (Date.now() - startTime < maxWait) {
+        window.setTimeout(attempt, retryDelay);
+      }
     }
 
-    window.setTimeout(() => {
-      activateSound();
-    }, 400);
-
-    window.setTimeout(() => {
-      activateSound();
-    }, 1200);
+    // TikTok only responds to the M shortcut once the player has mounted.
+    window.setTimeout(attempt, initialDelay);
   }
 
   function applySavedPosition() {
