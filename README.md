@@ -1,0 +1,34 @@
+# TikTok AutoLike Userscript
+
+This repository contains a Greasemonkey/Tampermonkey userscript derived from a
+bookmarklet. It adds a floating control panel to TikTok Web so you can run a
+simple auto-like loop with pause, stop, and drag support.
+
+## Files
+
+- `tiktok-autolike.user.js` - the userscript itself
+- `LICENSE` - MIT license
+
+## Features
+
+- Floating draggable panel
+- Clicks or minutes mode
+- Speed presets and a custom slider
+- Start, pause, stop, and close controls
+- Session persistence for panel position and settings
+
+## Install
+
+1. Install Greasemonkey, Tampermonkey, or a similar userscript manager.
+2. Open `tiktok-autolike.user.js` in your browser and install it.
+3. Visit `https://www.tiktok.com/` and open the panel.
+
+## Notes
+
+- The script looks for the visible like control on the page and clicks it when
+  it appears to be in the unliked state.
+- Use only where automation is allowed.
+
+## License
+
+MIT
