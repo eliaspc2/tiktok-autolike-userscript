@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.0.0
+// @version      1.0.2
 // @description  Floating control panel to automate likes on TikTok Web.
 // @author       eliaspc2
 // @match        https://www.tiktok.com/*
@@ -19,12 +19,20 @@
 
   const STORAGE_KEY = 'ttAutoLike.settings.v1';
   const PANEL_ID = 'tt-auto-like-panel';
+  const DEFAULT_PANEL_POSITION = {
+    top: 16,
+    right: 16,
+  };
+  const MODE_DEFAULT_VALUES = {
+    c: 50000,
+    m: 60,
+  };
   const DEFAULTS = {
     mode: 'c',
-    value: 5000,
+    value: MODE_DEFAULT_VALUES.c,
     speed: 30,
     manualValue: false,
-    top: 40,
+    top: DEFAULT_PANEL_POSITION.top,
     left: null,
   };
 
@@ -71,11 +79,15 @@
         return { ...DEFAULTS };
       }
       const parsed = JSON.parse(raw);
+      const mode = parsed.mode === 'm' ? 'm' : 'c';
+      const manualValue = Boolean(parsed.manualValue);
       return {
-        mode: parsed.mode === 'm' ? 'm' : 'c',
-        value: Number.isFinite(parsed.value) ? parsed.value : DEFAULTS.value,
+        mode,
+        value: manualValue && Number.isFinite(parsed.value)
+          ? parsed.value
+          : MODE_DEFAULT_VALUES[mode],
         speed: Number.isFinite(parsed.speed) ? parsed.speed : DEFAULTS.speed,
-        manualValue: Boolean(parsed.manualValue),
+        manualValue,
         top: Number.isFinite(parsed.top) ? parsed.top : DEFAULTS.top,
         left: Number.isFinite(parsed.left) ? parsed.left : DEFAULTS.left,
       };
@@ -297,7 +309,7 @@
     '    <div class="tt-pill" id="tt-status">Idle</div>',
     '  </div>',
     '  <div class="tt-body">',
-    '    <input id="tt-value" class="tt-field" type="number" value="5000" min="1" step="1" />',
+    `    <input id="tt-value" class="tt-field" type="number" value="${MODE_DEFAULT_VALUES.c}" min="1" step="1" />`,
     '    <div class="tt-row">',
     '      <button class="tt-btn active" id="tt-mode-clicks" type="button">Clicks</button>',
     '      <button class="tt-btn" id="tt-mode-minutes" type="button">Minutes</button>',
@@ -393,7 +405,7 @@
     setActive([modeClicks, modeMinutes], state.mode === 'c' ? modeClicks : modeMinutes);
 
     if (!state.manualValue) {
-      valueInput.value = state.mode === 'c' ? '5000' : '15';
+      valueInput.value = String(MODE_DEFAULT_VALUES[state.mode]);
       saveSettings({ mode: state.mode, value: clampFloat(valueInput.value, 1, 1000000) });
     } else {
       saveSettings({ mode: state.mode });
@@ -430,10 +442,12 @@
       panel.style.left = `${saved.left}px`;
       panel.style.top = `${saved.top}px`;
       panel.style.transform = 'none';
+      panel.style.right = 'auto';
     } else {
-      panel.style.left = '50%';
+      panel.style.left = 'auto';
+      panel.style.right = `${DEFAULT_PANEL_POSITION.right}px`;
       panel.style.top = `${saved.top}px`;
-      panel.style.transform = 'translateX(-50%)';
+      panel.style.transform = 'none';
     }
   }
 
@@ -569,6 +583,7 @@
     dragOffsetX = event.clientX - rect.left;
     dragOffsetY = event.clientY - rect.top;
     panel.style.transform = 'none';
+    panel.style.right = 'auto';
     document.body.style.userSelect = 'none';
     event.preventDefault();
   });
@@ -597,14 +612,14 @@
   modeClicks.addEventListener('click', function () {
     setMode('c');
     if (!state.manualValue) {
-      valueInput.value = '5000';
+      valueInput.value = String(MODE_DEFAULT_VALUES.c);
     }
   });
 
   modeMinutes.addEventListener('click', function () {
     setMode('m');
     if (!state.manualValue) {
-      valueInput.value = '15';
+      valueInput.value = String(MODE_DEFAULT_VALUES.m);
     }
   });
 

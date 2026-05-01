@@ -25,6 +25,8 @@ simple auto-like loop with pause, stop, and drag support.
 
 ## Notes
 
+- The panel starts near the top-right on first load and remembers the last dragged position.
+- The default values are 50,000 clicks in `Clicks` mode and 60 minutes in `Minutes` mode.
 - The script looks for the visible like control on the page and clicks it when
   it appears to be in the unliked state.
 - Use only where automation is allowed.
