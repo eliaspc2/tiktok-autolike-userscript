@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.6
+// @version      1.1.7
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -252,12 +252,13 @@
     '  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(59, 130, 246, 0.16));',
     '  border-bottom: 1px solid rgba(255, 255, 255, 0.08);',
     '}',
-    `#${PANEL_ID} .tt-header-copy { min-width: 0; cursor: move; }`,
+    `#${PANEL_ID} .tt-header-copy { min-width: 0; flex: 1 1 auto; cursor: move; }`,
     `#${PANEL_ID} .tt-header-controls {`,
     '  display: inline-flex;',
     '  align-items: flex-start;',
     '  gap: 8px;',
     '  flex: 0 0 auto;',
+    '  margin-left: auto;',
     '}',
     `#${PANEL_ID} .tt-title { font-weight: 700; letter-spacing: 0.02em; }`,
     `#${PANEL_ID} .tt-subtitle { font-size: 12px; color: rgba(229, 231, 235, 0.72); margin-top: 2px; }`,
@@ -294,9 +295,10 @@
     '  font-weight: 700;',
     '  line-height: 1;',
     '  cursor: pointer;',
-    '  position: absolute;',
-    '  top: 10px;',
-    '  right: 10px;',
+    '  position: static;',
+    '  flex: 0 0 auto;',
+    '  align-self: flex-start;',
+    '  z-index: 2;',
     '}',
     `#${PANEL_ID} .tt-icon-button:hover {`,
     '  background: rgba(239, 68, 68, 0.16);',
@@ -405,15 +407,15 @@
     '}',
     '</style>',
     '<div class="tt-card">',
-    '  <div class="tt-header" id="tt-drag">',
-    '    <div class="tt-header-copy">',
+    '  <div class="tt-header">',
+    '    <div class="tt-header-copy" id="tt-drag">',
     '      <div class="tt-title">TikTok AutoLike</div>',
     '      <div class="tt-subtitle">Greasemonkey userscript</div>',
     '    </div>',
     '    <div class="tt-header-controls">',
-    '      <div class="tt-pill" id="tt-status">Idle</div>',
+      '      <div class="tt-pill" id="tt-status">Idle</div>',
+    '      <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '    </div>',
-    '    <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '  </div>',
     '  <div class="tt-body">',
     `    <input id="tt-value" class="tt-field" type="number" value="${MODE_DEFAULT_VALUES.c}" min="1" step="1" />`,

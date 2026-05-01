@@ -27,7 +27,7 @@ simple auto-like loop with pause, stop, and drag support.
 
 - The panel now closes into a floating `TT` launcher with a status dot.
 - The open/closed state is remembered, so reopening the page brings back the same mode.
-- The panel uses a top-right cross to hide into the launcher.
+- The panel uses a top-right cross that sits in the header controls, separate from the drag area, so it stays easy to click.
 - The cross responds while the script is running or paused.
 - The script makes a best-effort attempt to unmute the current TikTok video on load, with a couple of short retries if the player is still mounting.
 - The panel starts near the top-right on first load and remembers the last dragged position.
