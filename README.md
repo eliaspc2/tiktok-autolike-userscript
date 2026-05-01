@@ -27,6 +27,7 @@ simple auto-like loop with pause, stop, and drag support.
 
 - The panel now closes into a floating `TT` launcher with a status dot.
 - The open/closed state is remembered, so reopening the page brings back the same mode.
+- The panel uses a top-right cross to hide into the launcher.
 - The panel starts near the top-right on first load and remembers the last dragged position.
 - The default values are 50,000 clicks in `Clicks` mode and 60 minutes in `Minutes` mode.
 - The script looks for the visible like control on the page and clicks it when

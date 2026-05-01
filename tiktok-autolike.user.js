@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.2
+// @version      1.1.3
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -244,13 +244,20 @@
     '}',
     `#${PANEL_ID} .tt-header {`,
     '  display: flex;',
-    '  align-items: center;',
+    '  align-items: flex-start;',
     '  justify-content: space-between;',
     '  gap: 12px;',
     '  padding: 12px 14px;',
     '  cursor: move;',
     '  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(59, 130, 246, 0.16));',
     '  border-bottom: 1px solid rgba(255, 255, 255, 0.08);',
+    '}',
+    `#${PANEL_ID} .tt-header-copy { min-width: 0; }`,
+    `#${PANEL_ID} .tt-header-controls {`,
+    '  display: inline-flex;',
+    '  align-items: flex-start;',
+    '  gap: 8px;',
+    '  flex: 0 0 auto;',
     '}',
     `#${PANEL_ID} .tt-title { font-weight: 700; letter-spacing: 0.02em; }`,
     `#${PANEL_ID} .tt-subtitle { font-size: 12px; color: rgba(229, 231, 235, 0.72); margin-top: 2px; }`,
@@ -272,6 +279,28 @@
     `#${PANEL_ID}[data-status="paused"] .tt-pill { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }`,
     `#${PANEL_ID}[data-status="finished"] .tt-pill,`,
     `#${PANEL_ID}[data-status="stopped"] .tt-pill { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }`,
+    `#${PANEL_ID} .tt-icon-button {`,
+    '  display: inline-flex;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  width: 28px;',
+    '  height: 28px;',
+    '  padding: 0;',
+    '  border: 1px solid rgba(255, 255, 255, 0.12);',
+    '  border-radius: 999px;',
+    '  background: rgba(255, 255, 255, 0.08);',
+    '  color: rgba(248, 113, 113, 0.95);',
+    '  font-size: 18px;',
+    '  font-weight: 700;',
+    '  line-height: 1;',
+    '  cursor: pointer;',
+    '}',
+    `#${PANEL_ID} .tt-icon-button:hover {`,
+    '  background: rgba(239, 68, 68, 0.16);',
+    '  border-color: rgba(239, 68, 68, 0.28);',
+    '  color: #fecaca;',
+    '}',
+    `#${PANEL_ID} .tt-icon-button:active { transform: translateY(1px); }`,
     `#${PANEL_ID} .tt-body { padding: 14px; display: grid; gap: 12px; }`,
     `#${PANEL_ID} .tt-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }`,
     `#${PANEL_ID} .tt-btn {`,
@@ -374,11 +403,14 @@
     '</style>',
     '<div class="tt-card">',
     '  <div class="tt-header" id="tt-drag">',
-    '    <div>',
+    '    <div class="tt-header-copy">',
     '      <div class="tt-title">TikTok AutoLike</div>',
     '      <div class="tt-subtitle">Greasemonkey userscript</div>',
     '    </div>',
-    '    <div class="tt-pill" id="tt-status">Idle</div>',
+    '    <div class="tt-header-controls">',
+    '      <div class="tt-pill" id="tt-status">Idle</div>',
+    '      <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
+    '    </div>',
     '  </div>',
     '  <div class="tt-body">',
     `    <input id="tt-value" class="tt-field" type="number" value="${MODE_DEFAULT_VALUES.c}" min="1" step="1" />`,
@@ -404,7 +436,6 @@
     '      <button class="tt-btn" id="tt-start" type="button">Start</button>',
     '      <button class="tt-btn" id="tt-pause" type="button">Pause</button>',
     '      <button class="tt-btn" id="tt-stop" type="button">Stop</button>',
-    '      <button class="tt-btn" id="tt-close" type="button">Close</button>',
     '    </div>',
     '    <div class="tt-metrics">',
     '      <div>Status: <strong id="tt-status-text">Idle</strong></div>',
@@ -699,7 +730,7 @@
   }
 
   dragHandle.addEventListener('mousedown', function (event) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || event.target.closest('.tt-header-controls')) {
       return;
     }
 
