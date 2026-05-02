@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.2.3
+// @version      1.2.4
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -29,8 +29,8 @@
     right: 16,
   };
   const DEFAULT_LAUNCHER_POSITION = {
-    top: 16,
-    right: 16,
+    left: 16,
+    bottom: 16,
   };
   const MODE_DEFAULT_VALUES = {
     c: 50000,
@@ -42,9 +42,19 @@
     speed: 30,
     manualValue: false,
     panelHidden: false,
+    status: 'idle',
+    running: false,
+    paused: false,
+    count: 0,
+    accumulatedElapsedMs: 0,
+    currentRunStartedAt: 0,
+    sessionTotalMs: null,
+    maxClicks: null,
+    nextShort: 0,
+    nextLong: 0,
     top: DEFAULT_PANEL_POSITION.top,
     left: null,
-    launcherTop: DEFAULT_LAUNCHER_POSITION.top,
+    launcherTop: null,
     launcherLeft: null,
   };
 
@@ -53,15 +63,16 @@
     paused: false,
     status: 'idle',
     count: 0,
-    startTime: 0,
     delayMin: 18,
     delayMax: 38,
     mode: DEFAULTS.mode,
     manualValue: DEFAULTS.manualValue,
+    accumulatedElapsedMs: DEFAULTS.accumulatedElapsedMs,
+    currentRunStartedAt: DEFAULTS.currentRunStartedAt,
+    sessionTotalMs: DEFAULTS.sessionTotalMs,
     nextShort: 0,
     nextLong: 0,
     maxClicks: Infinity,
-    endTime: Infinity,
     statsTimer: null,
   };
 
@@ -107,6 +118,22 @@
         speed: Number.isFinite(parsed.speed) ? parsed.speed : DEFAULTS.speed,
         manualValue,
         panelHidden: Boolean(parsed.panelHidden),
+        status: typeof parsed.status === 'string' ? parsed.status : DEFAULTS.status,
+        running: Boolean(parsed.running),
+        paused: Boolean(parsed.paused),
+        count: Number.isFinite(parsed.count) ? parsed.count : DEFAULTS.count,
+        accumulatedElapsedMs: Number.isFinite(parsed.accumulatedElapsedMs)
+          ? parsed.accumulatedElapsedMs
+          : DEFAULTS.accumulatedElapsedMs,
+        currentRunStartedAt: Number.isFinite(parsed.currentRunStartedAt)
+          ? parsed.currentRunStartedAt
+          : DEFAULTS.currentRunStartedAt,
+        sessionTotalMs: Number.isFinite(parsed.sessionTotalMs)
+          ? parsed.sessionTotalMs
+          : DEFAULTS.sessionTotalMs,
+        maxClicks: Number.isFinite(parsed.maxClicks) ? parsed.maxClicks : DEFAULTS.maxClicks,
+        nextShort: Number.isFinite(parsed.nextShort) ? parsed.nextShort : DEFAULTS.nextShort,
+        nextLong: Number.isFinite(parsed.nextLong) ? parsed.nextLong : DEFAULTS.nextLong,
         top: Number.isFinite(parsed.top) ? parsed.top : DEFAULTS.top,
         left: Number.isFinite(parsed.left) ? parsed.left : DEFAULTS.left,
         launcherTop: Number.isFinite(parsed.launcherTop) ? parsed.launcherTop : DEFAULTS.launcherTop,
@@ -359,9 +386,10 @@
     `#${PANEL_ID} .tt-metrics strong { color: #ffffff; }`,
     `#${LAUNCHER_ID} {`,
     '  position: fixed;',
-    `  top: ${DEFAULT_LAUNCHER_POSITION.top}px;`,
-    `  right: ${DEFAULT_LAUNCHER_POSITION.right}px;`,
-    '  left: auto;',
+    '  top: auto;',
+    '  right: auto;',
+    `  left: ${DEFAULT_LAUNCHER_POSITION.left}px;`,
+    `  bottom: ${DEFAULT_LAUNCHER_POSITION.bottom}px;`,
     '  display: none;',
     '  align-items: center;',
     '  justify-content: center;',
@@ -495,7 +523,6 @@
   let launcherDragMoved = false;
   let launcherDragOffsetX = 0;
   let launcherDragOffsetY = 0;
-  let launcherOpenSuppressedUntil = 0;
 
   function setActive(group, active) {
     group.forEach((button) => button.classList.remove('active'));
@@ -555,14 +582,44 @@
     launcher.setAttribute('aria-label', `TikTok AutoLike ${label}`);
   }
 
-  function updateStats() {
-    if (!state.running) {
-      return;
+  function getElapsedMs(now = Date.now()) {
+    return state.accumulatedElapsedMs + (state.running && !state.paused && state.currentRunStartedAt
+      ? now - state.currentRunStartedAt
+      : 0);
+  }
+
+  function getRemainingMs(now = Date.now()) {
+    if (!Number.isFinite(state.sessionTotalMs)) {
+      return Infinity;
     }
 
-    const elapsed = (Date.now() - state.startTime) / 1000;
-    timeText.textContent = `${Math.floor(elapsed)}s`;
-    rateText.textContent = elapsed > 0 ? String(Math.round((state.count / elapsed) * 60)) : '0';
+    return Math.max(0, state.sessionTotalMs - getElapsedMs(now));
+  }
+
+  function persistRuntimeState(extra = {}) {
+    const sessionTotalMs = Number.isFinite(state.sessionTotalMs) ? state.sessionTotalMs : null;
+    const maxClicks = Number.isFinite(state.maxClicks) ? state.maxClicks : null;
+
+    saveSettings({
+      status: state.status,
+      running: state.running,
+      paused: state.paused,
+      count: state.count,
+      accumulatedElapsedMs: state.accumulatedElapsedMs,
+      currentRunStartedAt: state.currentRunStartedAt,
+      sessionTotalMs,
+      maxClicks,
+      nextShort: state.nextShort,
+      nextLong: state.nextLong,
+      ...extra,
+    });
+  }
+
+  function updateStats() {
+    const elapsed = getElapsedMs();
+    const elapsedSeconds = elapsed / 1000;
+    timeText.textContent = `${Math.floor(elapsedSeconds)}s`;
+    rateText.textContent = elapsedSeconds > 0 ? String(Math.round((state.count / elapsedSeconds) * 60)) : '0';
   }
 
   function savePanelPosition() {
@@ -645,8 +702,7 @@
 
     const speakerIcon = Array.from(doc.querySelectorAll('svg')).find((svg) => {
       const viewBox = svg.getAttribute('viewBox') || '';
-      const className = (svg.getAttribute('class') || '').toLowerCase();
-      if (viewBox !== '0 0 48 48' || !className.includes('flip-rtl')) {
+      if (viewBox !== '0 0 48 48') {
         return false;
       }
 
@@ -658,17 +714,104 @@
     });
 
     if (speakerIcon) {
-      return speakerIcon.closest('button, div[role="button"], div.cursor-pointer') || speakerIcon.parentElement;
+      return findClickableAncestor(speakerIcon);
     }
 
     const icon = doc.querySelector(
       'svg[class*="sound"], svg[class*="volume"], svg[data-e2e*="sound"], svg[data-e2e*="mute"]',
     );
     if (icon) {
-      return icon.closest('button, div[role="button"], div.cursor-pointer') || icon.parentElement;
+      return findClickableAncestor(icon);
     }
 
     return null;
+  }
+
+  function findClickableAncestor(node) {
+    let current = node;
+
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      const label = (current.getAttribute('aria-label') || current.getAttribute('title') || '').toLowerCase();
+      if (
+        current.matches?.('button, [role="button"], [tabindex], [data-e2e], .cursor-pointer') ||
+        current.getAttribute('onclick') ||
+        /unmute|sound on|turn on sound|enable sound|volume|speaker|ligar som|ativar som/.test(label)
+      ) {
+        return current;
+      }
+
+      current = current.parentElement;
+    }
+
+    return node.parentElement || node;
+  }
+
+  function dispatchSoundActivationSequence(target, doc = document) {
+    if (!target || typeof target.dispatchEvent !== 'function') {
+      return false;
+    }
+
+    const view = doc.defaultView || window;
+    const rect = typeof target.getBoundingClientRect === 'function' ? target.getBoundingClientRect() : null;
+    const clientX = rect && Number.isFinite(rect.left) ? Math.round(rect.left + rect.width / 2) : 0;
+    const clientY = rect && Number.isFinite(rect.top) ? Math.round(rect.top + rect.height / 2) : 0;
+    const pointerInit = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view,
+      clientX,
+      clientY,
+      button: 0,
+      buttons: 1,
+    };
+    const mouseDownInit = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view,
+      clientX,
+      clientY,
+      button: 0,
+      buttons: 1,
+    };
+    const mouseUpInit = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view,
+      clientX,
+      clientY,
+      button: 0,
+      buttons: 0,
+    };
+
+    try {
+      if (typeof PointerEvent === 'function') {
+        target.dispatchEvent(new PointerEvent('pointerdown', { ...pointerInit, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+        target.dispatchEvent(new PointerEvent('pointerup', { ...pointerInit, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 0 }));
+      }
+    } catch (err) {
+      // Ignore PointerEvent constructor limitations and keep trying the mouse path.
+    }
+
+    try {
+      target.dispatchEvent(new MouseEvent('mousedown', mouseDownInit));
+      target.dispatchEvent(new MouseEvent('mouseup', mouseUpInit));
+      target.dispatchEvent(new MouseEvent('click', { ...mouseUpInit, buttons: 0 }));
+    } catch (err) {
+      // Ignore synthetic mouse failures and fall back to the native click helper.
+    }
+
+    try {
+      if (typeof target.click === 'function') {
+        target.click();
+      }
+    } catch (err) {
+      // Ignore native click failures.
+    }
+
+    return true;
   }
 
   function createMuteShortcutEvent(doc) {
@@ -743,27 +886,27 @@
 
   function activateSound() {
     const docs = collectAccessibleDocuments();
+    let attempted = false;
 
     for (const doc of docs) {
-      if (!hasReadyVideo(doc)) {
-        continue;
-      }
-
-      if (!isAudioLikelyMuted(doc)) {
-        continue;
-      }
-
       const soundTarget = findSoundTarget(doc);
-      if (soundTarget && clickLikeTarget(soundTarget)) {
-        return true;
+      if (soundTarget) {
+        attempted = true;
+        if (dispatchSoundActivationSequence(soundTarget, doc)) {
+          continue;
+        }
       }
 
-      if (dispatchMuteShortcut(doc)) {
-        return true;
+      if (isAudioLikelyMuted(doc) && dispatchMuteShortcut(doc)) {
+        attempted = true;
       }
     }
 
-    return false;
+    if (!attempted) {
+      return false;
+    }
+
+    return !collectAccessibleDocuments().some((doc) => isAudioLikelyMuted(doc));
   }
 
   function activateSoundAtStartup() {
@@ -827,16 +970,16 @@
   }
 
   function applySavedLauncherPosition() {
-    if (Number.isFinite(saved.launcherLeft)) {
+    if (Number.isFinite(saved.launcherLeft) && Number.isFinite(saved.launcherTop)) {
       launcher.style.left = `${saved.launcherLeft}px`;
       launcher.style.top = `${saved.launcherTop}px`;
       launcher.style.right = 'auto';
       launcher.style.bottom = 'auto';
     } else {
-      launcher.style.left = 'auto';
-      launcher.style.right = `${DEFAULT_LAUNCHER_POSITION.right}px`;
-      launcher.style.top = `${saved.launcherTop}px`;
-      launcher.style.bottom = 'auto';
+      launcher.style.left = `${DEFAULT_LAUNCHER_POSITION.left}px`;
+      launcher.style.bottom = `${DEFAULT_LAUNCHER_POSITION.bottom}px`;
+      launcher.style.right = 'auto';
+      launcher.style.top = 'auto';
     }
   }
 
@@ -848,6 +991,44 @@
     syncSpeedPreset();
     setMode(state.mode);
     setSpeed(saved.speed);
+  }
+
+  function restorePersistedRunState() {
+    state.count = Number.isFinite(saved.count) ? saved.count : 0;
+    state.accumulatedElapsedMs = Number.isFinite(saved.accumulatedElapsedMs) ? saved.accumulatedElapsedMs : 0;
+    state.currentRunStartedAt = Number.isFinite(saved.currentRunStartedAt) ? saved.currentRunStartedAt : 0;
+    state.sessionTotalMs = Number.isFinite(saved.sessionTotalMs)
+      ? saved.sessionTotalMs
+      : (state.mode === 'm' ? Math.max(1, clampFloat(valueInput.value, 1, 1000000)) * 60000 : Infinity);
+    state.maxClicks = Number.isFinite(saved.maxClicks)
+      ? saved.maxClicks
+      : (state.mode === 'c' ? Math.max(1, Math.floor(clampFloat(valueInput.value, 1, 1000000))) : Infinity);
+    state.nextShort = Number.isFinite(saved.nextShort) ? saved.nextShort : rand(200, 350);
+    state.nextLong = Number.isFinite(saved.nextLong) ? saved.nextLong : rand(600, 900);
+    state.running = Boolean(saved.running);
+    state.paused = Boolean(saved.paused);
+
+    likesText.textContent = String(state.count);
+    updateStats();
+
+    if (!state.running) {
+      const restoredStatus = ['stopped', 'finished', 'idle'].includes(saved.status) ? saved.status : 'idle';
+      setStatus(restoredStatus);
+      return;
+    }
+
+    if (state.count >= state.maxClicks || getRemainingMs() <= 0) {
+      stopRun('finished');
+      return;
+    }
+
+    setStatus(state.paused ? 'paused' : 'running');
+
+    if (state.statsTimer) {
+      window.clearInterval(state.statsTimer);
+    }
+    state.statsTimer = window.setInterval(updateStats, 500);
+    tick();
   }
 
   function showPanel(options = {}) {
@@ -875,7 +1056,9 @@
 
     const value = clampFloat(valueInput.value, 1, 1000000);
     state.count = 0;
-    state.startTime = Date.now();
+    state.accumulatedElapsedMs = 0;
+    state.currentRunStartedAt = Date.now();
+    state.sessionTotalMs = state.mode === 'm' ? Math.max(1, value) * 60000 : Infinity;
     state.nextShort = rand(200, 350);
     state.nextLong = rand(600, 900);
     state.running = true;
@@ -883,16 +1066,15 @@
 
     if (state.mode === 'c') {
       state.maxClicks = Math.max(1, Math.floor(value));
-      state.endTime = Infinity;
     } else {
       state.maxClicks = Infinity;
-      state.endTime = Date.now() + Math.max(1, value) * 60000;
     }
 
     likesText.textContent = '0';
     timeText.textContent = '0s';
     rateText.textContent = '0';
     setStatus('running');
+    persistRuntimeState();
 
     if (state.statsTimer) {
       window.clearInterval(state.statsTimer);
@@ -906,18 +1088,32 @@
       return;
     }
 
-    state.paused = !state.paused;
-    setStatus(state.paused ? 'paused' : 'running');
+    if (state.paused) {
+      state.paused = false;
+      state.currentRunStartedAt = Date.now();
+      setStatus('running');
+    } else {
+      if (state.currentRunStartedAt) {
+        state.accumulatedElapsedMs += Date.now() - state.currentRunStartedAt;
+      }
+      state.currentRunStartedAt = 0;
+      state.paused = true;
+      setStatus('paused');
+    }
+
+    persistRuntimeState();
   }
 
   function stopRun(nextStatus = 'stopped') {
     state.running = false;
     state.paused = false;
+    state.currentRunStartedAt = 0;
     if (state.statsTimer) {
       window.clearInterval(state.statsTimer);
       state.statsTimer = null;
     }
     setStatus(nextStatus);
+    persistRuntimeState();
   }
 
   function tick() {
@@ -937,7 +1133,7 @@
       return;
     }
 
-    if (state.count >= state.maxClicks || Date.now() >= state.endTime) {
+    if (state.count >= state.maxClicks || getRemainingMs() <= 0) {
       stopRun('finished');
       return;
     }
@@ -947,6 +1143,7 @@
       clickLikeTarget(target);
       state.count += 1;
       likesText.textContent = String(state.count);
+      persistRuntimeState();
     }
 
     let delay = rand(state.delayMin, state.delayMax);
@@ -965,11 +1162,11 @@
     }
 
     setStatus(reason);
+    persistRuntimeState();
     window.setTimeout(tick, delay);
   }
 
   function closePanel() {
-    launcherOpenSuppressedUntil = Date.now() + 350;
     hidePanel();
   }
 
@@ -1028,10 +1225,6 @@
   });
 
   launcher.addEventListener('click', function () {
-    if (Date.now() < launcherOpenSuppressedUntil) {
-      return;
-    }
-
     if (launcherDragMoved) {
       launcherDragMoved = false;
       return;
@@ -1155,11 +1348,11 @@
   applySavedPosition();
   applySavedLauncherPosition();
   applySavedControls();
-  setStatus('idle');
   window.ttAutoLikePanel = panel;
   if (saved.panelHidden) {
     hidePanel({ persist: false });
   } else {
     showPanel({ persist: false });
   }
+  restorePersistedRunState();
 })();

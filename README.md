@@ -15,7 +15,7 @@ simple auto-like loop with pause, stop, and drag support.
 - Clicks or minutes mode
 - Speed presets and a custom slider
 - Start, pause, stop, and close controls
-- Session persistence for panel position and settings
+- Session persistence for panel position, settings, and runtime state
 
 ## Install
 
@@ -25,10 +25,11 @@ simple auto-like loop with pause, stop, and drag support.
 
 ## Notes
 
-- The panel now closes into a floating `TT` launcher with a status dot.
+- The panel now closes into a floating `TT` launcher with a status dot, anchored in the bottom-left by default.
 - The open/closed state is remembered, so reopening the page brings back the same mode.
-- The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback, and it briefly suppresses the launcher so the same click does not reopen the panel immediately while the script is running.
-- The script starts trying to unmute on load, keeps retrying while the TikTok player mounts, checks accessible same-origin frames, and then tries the real unmute control or the `M` shortcut when the player still appears muted.
+- The last execution state is also remembered, including whether it was running or paused, the elapsed time, the count, and the next break thresholds, so a reload can resume the session instead of resetting it.
+- The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback.
+- The script starts trying to unmute on load, keeps retrying while the TikTok player mounts, checks accessible same-origin frames, and then tries the real unmute control with a full pointer/mouse click sequence or the `M` shortcut when the player still appears muted.
 - The panel starts near the top-right on first load and remembers the last dragged position.
 - The default values are 50,000 clicks in `Clicks` mode and 60 minutes in `Minutes` mode.
 - The script looks for the visible like control on the page and clicks it when
