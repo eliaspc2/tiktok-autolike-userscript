@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.2.0
+// @version      1.2.1
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -64,6 +64,11 @@
     endTime: Infinity,
     statsTimer: null,
   };
+
+  let soundBootstrapActive = false;
+  let soundBootstrapDone = false;
+  let soundBootstrapInterval = null;
+  let soundBootstrapObserver = null;
 
   function rand(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -710,6 +715,34 @@
     }
   }
 
+  function stopSoundBootstrap() {
+    soundBootstrapActive = false;
+
+    if (soundBootstrapInterval) {
+      window.clearInterval(soundBootstrapInterval);
+      soundBootstrapInterval = null;
+    }
+
+    if (soundBootstrapObserver) {
+      soundBootstrapObserver.disconnect();
+      soundBootstrapObserver = null;
+    }
+  }
+
+  function attemptSoundActivation() {
+    if (soundBootstrapDone) {
+      return true;
+    }
+
+    if (!activateSound()) {
+      return false;
+    }
+
+    soundBootstrapDone = true;
+    stopSoundBootstrap();
+    return true;
+  }
+
   function activateSound() {
     const docs = collectAccessibleDocuments();
 
@@ -736,23 +769,49 @@
   }
 
   function activateSoundAtStartup() {
-    const startTime = Date.now();
-    const initialDelay = 1500;
-    const retryDelay = 700;
-    const maxWait = 30000;
+    if (soundBootstrapActive || soundBootstrapDone) {
+      attemptSoundActivation();
+      return;
+    }
 
-    function attempt() {
-      if (activateSound()) {
+    soundBootstrapActive = true;
+    const startTime = Date.now();
+    const maxWait = 60000;
+
+    attemptSoundActivation();
+
+    soundBootstrapInterval = window.setInterval(() => {
+      if (soundBootstrapDone) {
+        stopSoundBootstrap();
         return;
       }
 
-      if (Date.now() - startTime < maxWait) {
-        window.setTimeout(attempt, retryDelay);
+      if (Date.now() - startTime >= maxWait) {
+        stopSoundBootstrap();
+        return;
       }
+
+      attemptSoundActivation();
+    }, 750);
+
+    if (typeof MutationObserver === 'function' && document.documentElement) {
+      soundBootstrapObserver = new MutationObserver(() => {
+        attemptSoundActivation();
+      });
+
+      soundBootstrapObserver.observe(document.documentElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
     }
 
-    // TikTok only responds to the M shortcut once the player has mounted.
-    window.setTimeout(attempt, initialDelay);
+    ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'play', 'playing', 'volumechange'].forEach((eventName) => {
+      document.addEventListener(eventName, attemptSoundActivation, true);
+    });
+
+    document.addEventListener('visibilitychange', attemptSoundActivation, true);
+    window.addEventListener('focus', attemptSoundActivation, true);
   }
 
   function applySavedPosition() {
@@ -836,7 +895,6 @@
     timeText.textContent = '0s';
     rateText.textContent = '0';
     setStatus('running');
-    activateSound();
 
     if (state.statsTimer) {
       window.clearInterval(state.statsTimer);
