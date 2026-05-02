@@ -27,7 +27,7 @@ simple auto-like loop with pause, stop, and drag support.
 
 - The panel now closes into a floating `TT` launcher with a status dot.
 - The open/closed state is remembered, so reopening the page brings back the same mode.
-- The panel uses a top-right cross that sits apart from the drag area, with a larger hit target and an `Escape` fallback, so it stays easy to close even while the script is running.
+- The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback, and it briefly suppresses the launcher so the same click does not reopen the panel immediately while the script is running.
 - The script starts trying to unmute on load, keeps retrying while the TikTok player mounts, checks accessible same-origin frames, and then tries the real unmute control or the `M` shortcut when the player still appears muted.
 - The panel starts near the top-right on first load and remembers the last dragged position.
 - The default values are 50,000 clicks in `Clicks` mode and 60 minutes in `Minutes` mode.

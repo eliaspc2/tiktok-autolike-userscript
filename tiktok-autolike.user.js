@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.2.1
+// @version      1.2.3
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -248,11 +248,11 @@
     '  backdrop-filter: blur(12px);',
     '}',
     `#${PANEL_ID} .tt-header {`,
-    '  display: flex;',
-    '  align-items: flex-start;',
-    '  justify-content: space-between;',
+    '  display: grid;',
+    '  grid-template-columns: minmax(0, 1fr) auto;',
     '  gap: 12px;',
-    '  padding: 12px 54px 12px 14px;',
+    '  align-items: start;',
+    '  padding: 12px 14px;',
     '  position: relative;',
     '  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(59, 130, 246, 0.16));',
     '  border-bottom: 1px solid rgba(255, 255, 255, 0.08);',
@@ -260,10 +260,10 @@
     `#${PANEL_ID} .tt-header-copy { min-width: 0; flex: 1 1 auto; cursor: move; }`,
     `#${PANEL_ID} .tt-header-controls {`,
     '  display: inline-flex;',
-    '  align-items: flex-start;',
+    '  align-items: center;',
     '  gap: 8px;',
     '  flex: 0 0 auto;',
-    '  margin-left: auto;',
+    '  justify-self: end;',
     '}',
     `#${PANEL_ID} .tt-title { font-weight: 700; letter-spacing: 0.02em; }`,
     `#${PANEL_ID} .tt-subtitle { font-size: 12px; color: rgba(229, 231, 235, 0.72); margin-top: 2px; }`,
@@ -289,8 +289,8 @@
     '  display: inline-flex;',
     '  align-items: center;',
     '  justify-content: center;',
-    '  width: 28px;',
-    '  height: 28px;',
+    '  width: 34px;',
+    '  height: 34px;',
     '  padding: 0;',
     '  border: 1px solid rgba(255, 255, 255, 0.12);',
     '  border-radius: 999px;',
@@ -300,15 +300,12 @@
     '  font-weight: 700;',
     '  line-height: 1;',
     '  cursor: pointer;',
-    '  position: absolute;',
-    '  top: 10px;',
-    '  right: 10px;',
     '  flex: 0 0 auto;',
+    '  position: static;',
     '  z-index: 3;',
-    '  width: 34px;',
-    '  height: 34px;',
     '  min-width: 34px;',
     '  min-height: 34px;',
+    '  touch-action: manipulation;',
     '}',
     `#${PANEL_ID} .tt-icon-button:hover {`,
     '  background: rgba(239, 68, 68, 0.16);',
@@ -424,8 +421,8 @@
     '    </div>',
     '    <div class="tt-header-controls">',
     '      <div class="tt-pill" id="tt-status">Idle</div>',
+    '      <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '    </div>',
-    '    <button class="tt-icon-button tt-close" id="tt-close" type="button" aria-label="Fechar painel" title="Fechar painel">&times;</button>',
     '  </div>',
     '  <div class="tt-body">',
     `    <input id="tt-value" class="tt-field" type="number" value="${MODE_DEFAULT_VALUES.c}" min="1" step="1" />`,
@@ -498,6 +495,7 @@
   let launcherDragMoved = false;
   let launcherDragOffsetX = 0;
   let launcherDragOffsetY = 0;
+  let launcherOpenSuppressedUntil = 0;
 
   function setActive(group, active) {
     group.forEach((button) => button.classList.remove('active'));
@@ -971,6 +969,7 @@
   }
 
   function closePanel() {
+    launcherOpenSuppressedUntil = Date.now() + 350;
     hidePanel();
   }
 
@@ -988,6 +987,10 @@
       }
     }
     closePanel();
+  }
+
+  function handleClosePointer(event) {
+    handleCloseIntent(event);
   }
 
   dragHandle.addEventListener('mousedown', function (event) {
@@ -1025,6 +1028,10 @@
   });
 
   launcher.addEventListener('click', function () {
+    if (Date.now() < launcherOpenSuppressedUntil) {
+      return;
+    }
+
     if (launcherDragMoved) {
       launcherDragMoved = false;
       return;
@@ -1117,7 +1124,19 @@
   startButton.addEventListener('click', startRun);
   pauseButton.addEventListener('click', pauseRun);
   stopButton.addEventListener('click', stopRun);
+  closeButton.addEventListener('pointerdown', handleClosePointer);
+  closeButton.addEventListener('mousedown', handleClosePointer);
   closeButton.addEventListener('click', handleCloseIntent);
+  panel.addEventListener('pointerdown', function (event) {
+    if (event.target && typeof event.target.closest === 'function' && event.target.closest('#tt-close')) {
+      handleCloseIntent(event);
+    }
+  }, true);
+  panel.addEventListener('mousedown', function (event) {
+    if (event.target && typeof event.target.closest === 'function' && event.target.closest('#tt-close')) {
+      handleCloseIntent(event);
+    }
+  }, true);
   panel.addEventListener('click', function (event) {
     if (event.target && typeof event.target.closest === 'function' && event.target.closest('#tt-close')) {
       handleCloseIntent(event);
