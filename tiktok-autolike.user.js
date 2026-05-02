@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.1.9
+// @version      1.2.0
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -574,18 +574,113 @@
     saveSettings({ launcherTop: top, launcherLeft: left });
   }
 
-  function hasReadyVideo() {
-    const video = document.querySelector('video');
-    return Boolean(video && video.readyState >= 2);
+  function collectAccessibleDocuments(rootDoc = document) {
+    const docs = [];
+    const queue = [rootDoc];
+    const seen = new Set();
+
+    while (queue.length > 0) {
+      const doc = queue.shift();
+      if (!doc || seen.has(doc)) {
+        continue;
+      }
+
+      seen.add(doc);
+      docs.push(doc);
+
+      Array.from(doc.querySelectorAll('iframe')).forEach((frame) => {
+        try {
+          const childDoc = frame.contentDocument;
+          if (childDoc) {
+            queue.push(childDoc);
+          }
+        } catch (err) {
+          // Ignore cross-origin frames and keep scanning the rest.
+        }
+      });
+    }
+
+    return docs;
   }
 
-  function createMuteShortcutEvent() {
+  function hasReadyVideo(doc = document) {
+    return Array.from(doc.querySelectorAll('video')).some((video) => video.readyState >= 2);
+  }
+
+  function isAudioLikelyMuted(doc = document) {
+    const videos = Array.from(doc.querySelectorAll('video'));
+    if (videos.some((video) => video.muted || video.volume === 0)) {
+      return true;
+    }
+
+    const soundTarget = findSoundTarget(doc);
+    if (!soundTarget) {
+      return false;
+    }
+
+    const label = getLabel(soundTarget).toLowerCase();
+    return /unmute|tap to unmute|turn on sound|sound on|enable sound|audio on|volume on|speaker on/.test(label);
+  }
+
+  function findSoundTarget(doc = document) {
+    const candidates = Array.from(
+      doc.querySelectorAll('button, div[role="button"], span[role="button"], [aria-label], [title], [data-e2e]'),
+    ).filter(isVisible);
+
+    const labeled = candidates.find((el) => {
+      const label = getLabel(el).toLowerCase();
+      if (!label) {
+        return false;
+      }
+
+      return /unmute|tap to unmute|turn on sound|sound on|enable sound|audio on|volume on|speaker on|ligar som|ativar som/.test(label);
+    });
+
+    if (labeled) {
+      return labeled;
+    }
+
+    const speakerIcon = Array.from(doc.querySelectorAll('svg')).find((svg) => {
+      const viewBox = svg.getAttribute('viewBox') || '';
+      const className = (svg.getAttribute('class') || '').toLowerCase();
+      if (viewBox !== '0 0 48 48' || !className.includes('flip-rtl')) {
+        return false;
+      }
+
+      const pathData = Array.from(svg.querySelectorAll('path'))
+        .map((path) => path.getAttribute('d') || '')
+        .join(' ');
+
+      return /M4 19a3 3 0 0 1 3-3h4\.15/.test(pathData) && /M37\.43 37\.44/.test(pathData);
+    });
+
+    if (speakerIcon) {
+      return speakerIcon.closest('button, div[role="button"], div.cursor-pointer') || speakerIcon.parentElement;
+    }
+
+    const icon = doc.querySelector(
+      'svg[class*="sound"], svg[class*="volume"], svg[data-e2e*="sound"], svg[data-e2e*="mute"]',
+    );
+    if (icon) {
+      return icon.closest('button, div[role="button"], div.cursor-pointer') || icon.parentElement;
+    }
+
+    return null;
+  }
+
+  function createMuteShortcutEvent(doc) {
     const event = new KeyboardEvent('keydown', {
       key: 'm',
       code: 'KeyM',
+      keyCode: 77,
+      which: 77,
+      charCode: 0,
+      location: 0,
+      repeat: false,
       bubbles: true,
       cancelable: true,
       composed: true,
+      view: doc.defaultView || window,
     });
 
     try {
@@ -601,25 +696,50 @@
     return event;
   }
 
-  function activateSound() {
-    if (!hasReadyVideo()) {
+  function dispatchMuteShortcut(doc = document) {
+    const target = doc.body || doc.documentElement || doc;
+    if (!target || typeof target.dispatchEvent !== 'function') {
       return false;
     }
 
-    const target = document.body || document.documentElement || document;
     try {
-      target.dispatchEvent(createMuteShortcutEvent());
+      target.dispatchEvent(createMuteShortcutEvent(doc));
       return true;
     } catch (err) {
       return false;
     }
   }
 
+  function activateSound() {
+    const docs = collectAccessibleDocuments();
+
+    for (const doc of docs) {
+      if (!hasReadyVideo(doc)) {
+        continue;
+      }
+
+      if (!isAudioLikelyMuted(doc)) {
+        continue;
+      }
+
+      const soundTarget = findSoundTarget(doc);
+      if (soundTarget && clickLikeTarget(soundTarget)) {
+        return true;
+      }
+
+      if (dispatchMuteShortcut(doc)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function activateSoundAtStartup() {
     const startTime = Date.now();
-    const initialDelay = 1000;
-    const retryDelay = 600;
-    const maxWait = 15000;
+    const initialDelay = 1500;
+    const retryDelay = 700;
+    const maxWait = 30000;
 
     function attempt() {
       if (activateSound()) {
@@ -716,6 +836,7 @@
     timeText.textContent = '0s';
     rateText.textContent = '0';
     setStatus('running');
+    activateSound();
 
     if (state.statsTimer) {
       window.clearInterval(state.statsTimer);
