@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.2.4
+// @version      1.3.0
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -80,6 +80,18 @@
   let soundBootstrapDone = false;
   let soundBootstrapInterval = null;
   let soundBootstrapObserver = null;
+  const soundBootstrapState = {
+    phase: 'loading',
+    detail: 'Waiting for page and player',
+    attempts: 0,
+    docReadyState: document.readyState,
+    readyDocs: 0,
+    mutedDocs: 0,
+    targetDocs: 0,
+    totalDocs: 0,
+    lastSeenAt: Date.now(),
+    failed: false,
+  };
 
   function rand(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -384,6 +396,18 @@
     '  color: rgba(229, 231, 235, 0.85);',
     '}',
     `#${PANEL_ID} .tt-metrics strong { color: #ffffff; }`,
+    `#${PANEL_ID} .tt-boot-line {`,
+    '  padding-top: 6px;',
+    '  border-top: 1px solid rgba(255, 255, 255, 0.06);',
+    '  font-size: 12px;',
+    '  color: rgba(229, 231, 235, 0.78);',
+    '}',
+    `#${PANEL_ID} .tt-boot-detail {`,
+    '  font-size: 11px;',
+    '  color: rgba(229, 231, 235, 0.62);',
+    '  line-height: 1.3;',
+    '  word-break: break-word;',
+    '}',
     `#${LAUNCHER_ID} {`,
     '  position: fixed;',
     '  top: auto;',
@@ -482,6 +506,8 @@
     '      <div>Likes sent: <strong id="tt-likes">0</strong></div>',
     '      <div>Time: <strong id="tt-time">0s</strong></div>',
     '      <div>Likes/min: <strong id="tt-rate">0</strong></div>',
+    '      <div class="tt-boot-line">Boot: <strong id="tt-boot-phase">LOADING</strong></div>',
+    '      <div class="tt-boot-detail" id="tt-boot-detail">Waiting for page and player</div>',
     '    </div>',
     '  </div>',
     '</div>',
@@ -503,6 +529,8 @@
   const likesText = panel.querySelector('#tt-likes');
   const timeText = panel.querySelector('#tt-time');
   const rateText = panel.querySelector('#tt-rate');
+  const bootPhaseText = panel.querySelector('#tt-boot-phase');
+  const bootDetailText = panel.querySelector('#tt-boot-detail');
   const slider = panel.querySelector('#tt-slider');
   const modeClicks = panel.querySelector('#tt-mode-clicks');
   const modeMinutes = panel.querySelector('#tt-mode-minutes');
@@ -578,8 +606,205 @@
     launcher.dataset.status = normalized;
     statusPill.textContent = label;
     statusText.textContent = label;
-    launcher.title = `TikTok AutoLike: ${label}. Clique para abrir o painel.`;
-    launcher.setAttribute('aria-label', `TikTok AutoLike ${label}`);
+    updateLauncherTitle();
+  }
+
+  function normalizeBootPhase(phase) {
+    const normalized = String(phase || 'loading').toLowerCase();
+    if (['loading', 'mounting', 'ready', 'trying-unmute', 'unmuted', 'failed'].includes(normalized)) {
+      return normalized;
+    }
+
+    return 'loading';
+  }
+
+  function updateLauncherTitle() {
+    const statusLabel = String(state.status || 'idle').toUpperCase();
+    const bootLabel = String(soundBootstrapState.phase || 'loading').toUpperCase();
+    const detail = soundBootstrapState.detail ? ` · ${soundBootstrapState.detail}` : '';
+
+    launcher.title = `TikTok AutoLike: ${statusLabel} · Boot: ${bootLabel}${detail}. Clique para abrir o painel.`;
+    launcher.setAttribute('aria-label', `TikTok AutoLike ${statusLabel}, boot ${bootLabel}`);
+  }
+
+  function renderBootState(next = {}) {
+    if (next.phase) {
+      soundBootstrapState.phase = normalizeBootPhase(next.phase);
+    }
+
+    if (typeof next.detail === 'string') {
+      soundBootstrapState.detail = next.detail;
+    }
+
+    if (Number.isFinite(next.attempts)) {
+      soundBootstrapState.attempts = next.attempts;
+    }
+
+    if (typeof next.docReadyState === 'string') {
+      soundBootstrapState.docReadyState = next.docReadyState;
+    }
+
+    if (Number.isFinite(next.readyDocs)) {
+      soundBootstrapState.readyDocs = next.readyDocs;
+    }
+
+    if (Number.isFinite(next.mutedDocs)) {
+      soundBootstrapState.mutedDocs = next.mutedDocs;
+    }
+
+    if (Number.isFinite(next.targetDocs)) {
+      soundBootstrapState.targetDocs = next.targetDocs;
+    }
+
+    if (Number.isFinite(next.totalDocs)) {
+      soundBootstrapState.totalDocs = next.totalDocs;
+    }
+
+    if (typeof next.failed === 'boolean') {
+      soundBootstrapState.failed = next.failed;
+    }
+
+    soundBootstrapState.lastSeenAt = Date.now();
+
+    if (bootPhaseText) {
+      bootPhaseText.textContent = soundBootstrapState.phase.replace(/-/g, ' ').toUpperCase();
+    }
+
+    if (bootDetailText) {
+      const pieces = [
+        `doc ${soundBootstrapState.docReadyState}`,
+        `docs ${soundBootstrapState.totalDocs}`,
+        `ready ${soundBootstrapState.readyDocs}`,
+        `muted ${soundBootstrapState.mutedDocs}`,
+        `targets ${soundBootstrapState.targetDocs}`,
+        `tries ${soundBootstrapState.attempts}`,
+      ];
+      if (soundBootstrapState.failed) {
+        pieces.push('failed');
+      }
+      bootDetailText.textContent = soundBootstrapState.detail
+        ? `${soundBootstrapState.detail} · ${pieces.join(' · ')}`
+        : pieces.join(' · ');
+    }
+
+    updateLauncherTitle();
+  }
+
+  function collectSoundBootstrapSnapshot() {
+    const docs = collectAccessibleDocuments();
+    const docReadyState = document.readyState;
+    let readyDocs = 0;
+    let mutedDocs = 0;
+    let targetDocs = 0;
+    const entries = [];
+
+    for (const doc of docs) {
+      const videos = Array.from(doc.querySelectorAll('video'));
+      const ready = videos.some((video) => video.readyState >= 2);
+      const target = findSoundTarget(doc);
+      const muted = isAudioLikelyMuted(doc, target);
+
+      if (ready) {
+        readyDocs += 1;
+      }
+
+      if (muted) {
+        mutedDocs += 1;
+      }
+
+      if (target) {
+        targetDocs += 1;
+      }
+
+      entries.push({
+        doc,
+        ready,
+        muted,
+        target,
+      });
+    }
+
+    return {
+      docReadyState,
+      totalDocs: docs.length,
+      readyDocs,
+      mutedDocs,
+      targetDocs,
+      entries,
+    };
+  }
+
+  function describeBootPhase(snapshot) {
+    if (snapshot.docReadyState === 'loading') {
+      return {
+        phase: 'loading',
+        detail: 'Waiting for the page to finish loading',
+      };
+    }
+
+    if (snapshot.readyDocs === 0) {
+      return {
+        phase: 'mounting',
+        detail: 'TikTok player still mounting',
+      };
+    }
+
+    if (snapshot.mutedDocs === 0) {
+      return {
+        phase: 'unmuted',
+        detail: 'Audio already appears active',
+      };
+    }
+
+    if (soundBootstrapDone) {
+      return {
+        phase: 'unmuted',
+        detail: 'Audio activation confirmed',
+      };
+    }
+
+    if (soundBootstrapActive) {
+      return {
+        phase: 'trying-unmute',
+        detail: snapshot.targetDocs > 0
+          ? 'Target found, trying unmute'
+          : 'Ready player, waiting for sound target',
+      };
+    }
+
+    return {
+      phase: 'ready',
+      detail: snapshot.targetDocs > 0
+        ? 'Player ready and sound target visible'
+        : 'Player ready, sound target not visible',
+    };
+  }
+
+  function activateSoundFromSnapshot(snapshot) {
+    let attempted = false;
+
+    for (const entry of snapshot.entries) {
+      if (!entry.ready) {
+        continue;
+      }
+
+      if (!entry.muted) {
+        continue;
+      }
+
+      if (entry.target) {
+        attempted = true;
+        if (dispatchSoundActivationSequence(entry.target, entry.doc)) {
+          continue;
+        }
+      }
+
+      if (dispatchMuteShortcut(entry.doc)) {
+        attempted = true;
+      }
+    }
+
+    return attempted;
   }
 
   function getElapsedMs(now = Date.now()) {
@@ -599,14 +824,19 @@
   function persistRuntimeState(extra = {}) {
     const sessionTotalMs = Number.isFinite(state.sessionTotalMs) ? state.sessionTotalMs : null;
     const maxClicks = Number.isFinite(state.maxClicks) ? state.maxClicks : null;
+    const liveElapsedMs = state.running && !state.paused && state.currentRunStartedAt
+      ? Date.now() - state.currentRunStartedAt
+      : 0;
+    const accumulatedElapsedMs = state.accumulatedElapsedMs + liveElapsedMs;
+    const currentRunStartedAt = state.running && !state.paused ? 0 : state.currentRunStartedAt;
 
     saveSettings({
       status: state.status,
       running: state.running,
       paused: state.paused,
       count: state.count,
-      accumulatedElapsedMs: state.accumulatedElapsedMs,
-      currentRunStartedAt: state.currentRunStartedAt,
+      accumulatedElapsedMs,
+      currentRunStartedAt,
       sessionTotalMs,
       maxClicks,
       nextShort: state.nextShort,
@@ -663,17 +893,13 @@
     return docs;
   }
 
-  function hasReadyVideo(doc = document) {
-    return Array.from(doc.querySelectorAll('video')).some((video) => video.readyState >= 2);
-  }
-
-  function isAudioLikelyMuted(doc = document) {
+  function isAudioLikelyMuted(doc = document, providedTarget = null) {
     const videos = Array.from(doc.querySelectorAll('video'));
     if (videos.some((video) => video.muted || video.volume === 0)) {
       return true;
     }
 
-    const soundTarget = findSoundTarget(doc);
+    const soundTarget = providedTarget || findSoundTarget(doc);
     if (!soundTarget) {
       return false;
     }
@@ -875,38 +1101,46 @@
       return true;
     }
 
-    if (!activateSound()) {
-      return false;
+    const snapshot = collectSoundBootstrapSnapshot();
+    soundBootstrapState.attempts += 1;
+    renderBootState(snapshot);
+
+    const phaseInfo = describeBootPhase(snapshot);
+    renderBootState({
+      ...snapshot,
+      ...phaseInfo,
+      attempts: soundBootstrapState.attempts,
+    });
+
+    if (snapshot.readyDocs === 0 || snapshot.mutedDocs === 0) {
+      if (snapshot.mutedDocs === 0 && snapshot.readyDocs > 0) {
+        soundBootstrapDone = true;
+        stopSoundBootstrap();
+      }
+      return snapshot.mutedDocs === 0;
     }
 
-    soundBootstrapDone = true;
-    stopSoundBootstrap();
-    return true;
+    const attempted = activateSoundFromSnapshot(snapshot);
+    const afterSnapshot = collectSoundBootstrapSnapshot();
+    const afterPhase = describeBootPhase(afterSnapshot);
+
+    renderBootState({
+      ...afterSnapshot,
+      ...afterPhase,
+      attempts: soundBootstrapState.attempts,
+    });
+
+    if (afterSnapshot.mutedDocs === 0) {
+      soundBootstrapDone = true;
+      stopSoundBootstrap();
+      return true;
+    }
+
+    return attempted;
   }
 
   function activateSound() {
-    const docs = collectAccessibleDocuments();
-    let attempted = false;
-
-    for (const doc of docs) {
-      const soundTarget = findSoundTarget(doc);
-      if (soundTarget) {
-        attempted = true;
-        if (dispatchSoundActivationSequence(soundTarget, doc)) {
-          continue;
-        }
-      }
-
-      if (isAudioLikelyMuted(doc) && dispatchMuteShortcut(doc)) {
-        attempted = true;
-      }
-    }
-
-    if (!attempted) {
-      return false;
-    }
-
-    return !collectAccessibleDocuments().some((doc) => isAudioLikelyMuted(doc));
+    return activateSoundFromSnapshot(collectSoundBootstrapSnapshot());
   }
 
   function activateSoundAtStartup() {
@@ -918,6 +1152,12 @@
     soundBootstrapActive = true;
     const startTime = Date.now();
     const maxWait = 60000;
+    const initialSnapshot = collectSoundBootstrapSnapshot();
+    renderBootState({
+      ...initialSnapshot,
+      ...describeBootPhase(initialSnapshot),
+      attempts: soundBootstrapState.attempts,
+    });
 
     attemptSoundActivation();
 
@@ -928,6 +1168,15 @@
       }
 
       if (Date.now() - startTime >= maxWait) {
+        const failedSnapshot = collectSoundBootstrapSnapshot();
+        renderBootState({
+          ...failedSnapshot,
+          phase: 'failed',
+          detail: 'Sound bootstrap timed out',
+          attempts: soundBootstrapState.attempts,
+          failed: true,
+        });
+        soundBootstrapState.failed = true;
         stopSoundBootstrap();
         return;
       }
@@ -947,12 +1196,13 @@
       });
     }
 
-    ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'play', 'playing', 'volumechange'].forEach((eventName) => {
+    ['readystatechange', 'loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'play', 'playing', 'volumechange'].forEach((eventName) => {
       document.addEventListener(eventName, attemptSoundActivation, true);
     });
 
     document.addEventListener('visibilitychange', attemptSoundActivation, true);
     window.addEventListener('focus', attemptSoundActivation, true);
+    window.addEventListener('load', attemptSoundActivation, true);
   }
 
   function applySavedPosition() {
@@ -996,7 +1246,6 @@
   function restorePersistedRunState() {
     state.count = Number.isFinite(saved.count) ? saved.count : 0;
     state.accumulatedElapsedMs = Number.isFinite(saved.accumulatedElapsedMs) ? saved.accumulatedElapsedMs : 0;
-    state.currentRunStartedAt = Number.isFinite(saved.currentRunStartedAt) ? saved.currentRunStartedAt : 0;
     state.sessionTotalMs = Number.isFinite(saved.sessionTotalMs)
       ? saved.sessionTotalMs
       : (state.mode === 'm' ? Math.max(1, clampFloat(valueInput.value, 1, 1000000)) * 60000 : Infinity);
@@ -1017,12 +1266,15 @@
       return;
     }
 
+    state.currentRunStartedAt = state.paused ? 0 : Date.now();
+
     if (state.count >= state.maxClicks || getRemainingMs() <= 0) {
       stopRun('finished');
       return;
     }
 
     setStatus(state.paused ? 'paused' : 'running');
+    persistRuntimeState();
 
     if (state.statsTimer) {
       window.clearInterval(state.statsTimer);
@@ -1168,6 +1420,12 @@
 
   function closePanel() {
     hidePanel();
+  }
+
+  function handleSessionUnload() {
+    if (state.running || state.paused) {
+      persistRuntimeState();
+    }
   }
 
   function updateModeFromInput() {
@@ -1340,6 +1598,8 @@
       handleCloseIntent(event);
     }
   }, true);
+  window.addEventListener('beforeunload', handleSessionUnload);
+  window.addEventListener('pagehide', handleSessionUnload);
 
   const mountPoint = document.body || document.documentElement;
   mountPoint.appendChild(panel);
