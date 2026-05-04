@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.3.0
+// @version      1.3.1
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -1306,6 +1306,8 @@
       return;
     }
 
+    activateSoundAtStartup();
+
     const value = clampFloat(valueInput.value, 1, 1000000);
     state.count = 0;
     state.accumulatedElapsedMs = 0;
@@ -1604,7 +1606,6 @@
   const mountPoint = document.body || document.documentElement;
   mountPoint.appendChild(panel);
   mountPoint.appendChild(launcher);
-  activateSoundAtStartup();
   applySavedPosition();
   applySavedLauncherPosition();
   applySavedControls();
