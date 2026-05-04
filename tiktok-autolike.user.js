@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.3.2
+// @version      1.3.3
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -1367,6 +1367,7 @@
       window.clearInterval(state.statsTimer);
       state.statsTimer = null;
     }
+    stopSoundBootstrap();
     setStatus(nextStatus);
     persistRuntimeState();
   }
@@ -1422,6 +1423,9 @@
   }
 
   function closePanel() {
+    if (state.running || state.paused) {
+      stopRun('stopped');
+    }
     hidePanel();
   }
 

@@ -28,7 +28,7 @@ simple auto-like loop with pause, stop, and drag support.
 - The panel now closes into a floating `TT` launcher with a status dot, anchored in the bottom-left by default.
 - The open/closed state is remembered, so reopening the page brings back the same mode.
 - The last execution state is also remembered, including whether it was running or paused, the elapsed time, the count, and the next break thresholds, so a reload can resume the session instead of resetting it.
-- The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback.
+- The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback. If a run is active, the cross stops it before hiding the panel.
 - The script shows a boot line in the panel and launcher title so you can see whether it is loading, mounting, trying to unmute, or already unmuted.
 - The script now runs in Tampermonkey `DOM` sandbox mode and the sound bootstrap starts only when you press `Start`, which keeps the page load quieter and avoids touching TikTok unless you actually launch a run.
 - The panel starts near the top-right on first load and remembers the last dragged position.
