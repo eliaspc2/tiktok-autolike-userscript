@@ -30,7 +30,7 @@ simple auto-like loop with pause, stop, and drag support.
 - The last execution state is also remembered, including whether it was running or paused, the elapsed time, the count, and the next break thresholds, so a reload can resume the session instead of resetting it.
 - The panel uses a top-right cross in the header controls, with `pointerdown` and `Escape` fallback.
 - The script shows a boot line in the panel and launcher title so you can see whether it is loading, mounting, trying to unmute, or already unmuted.
-- The sound bootstrap now starts only when you press `Start`, which keeps the page load quieter and avoids touching TikTok unless you actually launch a run.
+- The script now runs in Tampermonkey `DOM` sandbox mode and the sound bootstrap starts only when you press `Start`, which keeps the page load quieter and avoids touching TikTok unless you actually launch a run.
 - The panel starts near the top-right on first load and remembers the last dragged position.
 - The default values are 50,000 clicks in `Clicks` mode and 60 minutes in `Minutes` mode.
 - The script looks for the visible like control on the page and clicks it when
