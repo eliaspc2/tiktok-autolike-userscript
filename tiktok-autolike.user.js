@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.3.3
+// @version      1.3.4
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -10,8 +10,7 @@
 // @author       eliaspc2
 // @match        https://www.tiktok.com/*
 // @run-at       document-idle
-// @sandbox      DOM
-// @grant        GM_addStyle
+// @grant        none
 // @noframes
 // ==/UserScript==
 
