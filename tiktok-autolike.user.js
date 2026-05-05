@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok AutoLike Panel
 // @namespace    https://github.com/eliaspc2/tiktok-autolike-userscript
-// @version      1.3.4
+// @version      1.3.6
 // @homepageURL  https://github.com/eliaspc2/tiktok-autolike-userscript
 // @downloadURL  https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
 // @updateURL    https://raw.githubusercontent.com/eliaspc2/tiktok-autolike-userscript/main/tiktok-autolike.user.js
@@ -74,23 +74,6 @@
     nextLong: 0,
     maxClicks: Infinity,
     statsTimer: null,
-  };
-
-  let soundBootstrapActive = false;
-  let soundBootstrapDone = false;
-  let soundBootstrapInterval = null;
-  let soundBootstrapObserver = null;
-  const soundBootstrapState = {
-    phase: 'loading',
-    detail: 'Waiting for page and player',
-    attempts: 0,
-    docReadyState: document.readyState,
-    readyDocs: 0,
-    mutedDocs: 0,
-    targetDocs: 0,
-    totalDocs: 0,
-    lastSeenAt: Date.now(),
-    failed: false,
   };
 
   function rand(min, max) {
@@ -396,18 +379,6 @@
     '  color: rgba(229, 231, 235, 0.85);',
     '}',
     `#${PANEL_ID} .tt-metrics strong { color: #ffffff; }`,
-    `#${PANEL_ID} .tt-boot-line {`,
-    '  padding-top: 6px;',
-    '  border-top: 1px solid rgba(255, 255, 255, 0.06);',
-    '  font-size: 12px;',
-    '  color: rgba(229, 231, 235, 0.78);',
-    '}',
-    `#${PANEL_ID} .tt-boot-detail {`,
-    '  font-size: 11px;',
-    '  color: rgba(229, 231, 235, 0.62);',
-    '  line-height: 1.3;',
-    '  word-break: break-word;',
-    '}',
     `#${LAUNCHER_ID} {`,
     '  position: fixed;',
     '  top: auto;',
@@ -506,8 +477,6 @@
     '      <div>Likes sent: <strong id="tt-likes">0</strong></div>',
     '      <div>Time: <strong id="tt-time">0s</strong></div>',
     '      <div>Likes/min: <strong id="tt-rate">0</strong></div>',
-    '      <div class="tt-boot-line">Boot: <strong id="tt-boot-phase">LOADING</strong></div>',
-    '      <div class="tt-boot-detail" id="tt-boot-detail">Waiting for page and player</div>',
     '    </div>',
     '  </div>',
     '</div>',
@@ -529,8 +498,6 @@
   const likesText = panel.querySelector('#tt-likes');
   const timeText = panel.querySelector('#tt-time');
   const rateText = panel.querySelector('#tt-rate');
-  const bootPhaseText = panel.querySelector('#tt-boot-phase');
-  const bootDetailText = panel.querySelector('#tt-boot-detail');
   const slider = panel.querySelector('#tt-slider');
   const modeClicks = panel.querySelector('#tt-mode-clicks');
   const modeMinutes = panel.querySelector('#tt-mode-minutes');
@@ -606,205 +573,8 @@
     launcher.dataset.status = normalized;
     statusPill.textContent = label;
     statusText.textContent = label;
-    updateLauncherTitle();
-  }
-
-  function normalizeBootPhase(phase) {
-    const normalized = String(phase || 'loading').toLowerCase();
-    if (['loading', 'mounting', 'ready', 'trying-unmute', 'unmuted', 'failed'].includes(normalized)) {
-      return normalized;
-    }
-
-    return 'loading';
-  }
-
-  function updateLauncherTitle() {
-    const statusLabel = String(state.status || 'idle').toUpperCase();
-    const bootLabel = String(soundBootstrapState.phase || 'loading').toUpperCase();
-    const detail = soundBootstrapState.detail ? ` · ${soundBootstrapState.detail}` : '';
-
-    launcher.title = `TikTok AutoLike: ${statusLabel} · Boot: ${bootLabel}${detail}. Clique para abrir o painel.`;
-    launcher.setAttribute('aria-label', `TikTok AutoLike ${statusLabel}, boot ${bootLabel}`);
-  }
-
-  function renderBootState(next = {}) {
-    if (next.phase) {
-      soundBootstrapState.phase = normalizeBootPhase(next.phase);
-    }
-
-    if (typeof next.detail === 'string') {
-      soundBootstrapState.detail = next.detail;
-    }
-
-    if (Number.isFinite(next.attempts)) {
-      soundBootstrapState.attempts = next.attempts;
-    }
-
-    if (typeof next.docReadyState === 'string') {
-      soundBootstrapState.docReadyState = next.docReadyState;
-    }
-
-    if (Number.isFinite(next.readyDocs)) {
-      soundBootstrapState.readyDocs = next.readyDocs;
-    }
-
-    if (Number.isFinite(next.mutedDocs)) {
-      soundBootstrapState.mutedDocs = next.mutedDocs;
-    }
-
-    if (Number.isFinite(next.targetDocs)) {
-      soundBootstrapState.targetDocs = next.targetDocs;
-    }
-
-    if (Number.isFinite(next.totalDocs)) {
-      soundBootstrapState.totalDocs = next.totalDocs;
-    }
-
-    if (typeof next.failed === 'boolean') {
-      soundBootstrapState.failed = next.failed;
-    }
-
-    soundBootstrapState.lastSeenAt = Date.now();
-
-    if (bootPhaseText) {
-      bootPhaseText.textContent = soundBootstrapState.phase.replace(/-/g, ' ').toUpperCase();
-    }
-
-    if (bootDetailText) {
-      const pieces = [
-        `doc ${soundBootstrapState.docReadyState}`,
-        `docs ${soundBootstrapState.totalDocs}`,
-        `ready ${soundBootstrapState.readyDocs}`,
-        `muted ${soundBootstrapState.mutedDocs}`,
-        `targets ${soundBootstrapState.targetDocs}`,
-        `tries ${soundBootstrapState.attempts}`,
-      ];
-      if (soundBootstrapState.failed) {
-        pieces.push('failed');
-      }
-      bootDetailText.textContent = soundBootstrapState.detail
-        ? `${soundBootstrapState.detail} · ${pieces.join(' · ')}`
-        : pieces.join(' · ');
-    }
-
-    updateLauncherTitle();
-  }
-
-  function collectSoundBootstrapSnapshot() {
-    const docs = collectAccessibleDocuments();
-    const docReadyState = document.readyState;
-    let readyDocs = 0;
-    let mutedDocs = 0;
-    let targetDocs = 0;
-    const entries = [];
-
-    for (const doc of docs) {
-      const videos = Array.from(doc.querySelectorAll('video'));
-      const ready = videos.some((video) => video.readyState >= 2);
-      const target = findSoundTarget(doc);
-      const muted = isAudioLikelyMuted(doc, target);
-
-      if (ready) {
-        readyDocs += 1;
-      }
-
-      if (muted) {
-        mutedDocs += 1;
-      }
-
-      if (target) {
-        targetDocs += 1;
-      }
-
-      entries.push({
-        doc,
-        ready,
-        muted,
-        target,
-      });
-    }
-
-    return {
-      docReadyState,
-      totalDocs: docs.length,
-      readyDocs,
-      mutedDocs,
-      targetDocs,
-      entries,
-    };
-  }
-
-  function describeBootPhase(snapshot) {
-    if (snapshot.docReadyState === 'loading') {
-      return {
-        phase: 'loading',
-        detail: 'Waiting for the page to finish loading',
-      };
-    }
-
-    if (snapshot.readyDocs === 0) {
-      return {
-        phase: 'mounting',
-        detail: 'TikTok player still mounting',
-      };
-    }
-
-    if (snapshot.mutedDocs === 0) {
-      return {
-        phase: 'unmuted',
-        detail: 'Audio already appears active',
-      };
-    }
-
-    if (soundBootstrapDone) {
-      return {
-        phase: 'unmuted',
-        detail: 'Audio activation confirmed',
-      };
-    }
-
-    if (soundBootstrapActive) {
-      return {
-        phase: 'trying-unmute',
-        detail: snapshot.targetDocs > 0
-          ? 'Target found, trying unmute'
-          : 'Ready player, waiting for sound target',
-      };
-    }
-
-    return {
-      phase: 'ready',
-      detail: snapshot.targetDocs > 0
-        ? 'Player ready and sound target visible'
-        : 'Player ready, sound target not visible',
-    };
-  }
-
-  function activateSoundFromSnapshot(snapshot) {
-    let attempted = false;
-
-    for (const entry of snapshot.entries) {
-      if (!entry.ready) {
-        continue;
-      }
-
-      if (!entry.muted) {
-        continue;
-      }
-
-      if (entry.target) {
-        attempted = true;
-        if (dispatchSoundActivationSequence(entry.target, entry.doc)) {
-          continue;
-        }
-      }
-
-      if (dispatchMuteShortcut(entry.doc)) {
-        attempted = true;
-      }
-    }
-
-    return attempted;
+    launcher.title = `TikTok AutoLike: ${label}. Clique para abrir o painel.`;
+    launcher.setAttribute('aria-label', `TikTok AutoLike ${label}`);
   }
 
   function getElapsedMs(now = Date.now()) {
@@ -862,347 +632,6 @@
     const top = Math.round(launcher.getBoundingClientRect().top);
     const left = Math.round(launcher.getBoundingClientRect().left);
     saveSettings({ launcherTop: top, launcherLeft: left });
-  }
-
-  function collectAccessibleDocuments(rootDoc = document) {
-    const docs = [];
-    const queue = [rootDoc];
-    const seen = new Set();
-
-    while (queue.length > 0) {
-      const doc = queue.shift();
-      if (!doc || seen.has(doc)) {
-        continue;
-      }
-
-      seen.add(doc);
-      docs.push(doc);
-
-      Array.from(doc.querySelectorAll('iframe')).forEach((frame) => {
-        try {
-          const childDoc = frame.contentDocument;
-          if (childDoc) {
-            queue.push(childDoc);
-          }
-        } catch (err) {
-          // Ignore cross-origin frames and keep scanning the rest.
-        }
-      });
-    }
-
-    return docs;
-  }
-
-  function isAudioLikelyMuted(doc = document, providedTarget = null) {
-    const videos = Array.from(doc.querySelectorAll('video'));
-    if (videos.some((video) => video.muted || video.volume === 0)) {
-      return true;
-    }
-
-    const soundTarget = providedTarget || findSoundTarget(doc);
-    if (!soundTarget) {
-      return false;
-    }
-
-    const label = getLabel(soundTarget).toLowerCase();
-    return /unmute|tap to unmute|turn on sound|sound on|enable sound|audio on|volume on|speaker on/.test(label);
-  }
-
-  function findSoundTarget(doc = document) {
-    const candidates = Array.from(
-      doc.querySelectorAll('button, div[role="button"], span[role="button"], [aria-label], [title], [data-e2e]'),
-    ).filter(isVisible);
-
-    const labeled = candidates.find((el) => {
-      const label = getLabel(el).toLowerCase();
-      if (!label) {
-        return false;
-      }
-
-      return /unmute|tap to unmute|turn on sound|sound on|enable sound|audio on|volume on|speaker on|ligar som|ativar som/.test(label);
-    });
-
-    if (labeled) {
-      return labeled;
-    }
-
-    const speakerIcon = Array.from(doc.querySelectorAll('svg')).find((svg) => {
-      const viewBox = svg.getAttribute('viewBox') || '';
-      if (viewBox !== '0 0 48 48') {
-        return false;
-      }
-
-      const pathData = Array.from(svg.querySelectorAll('path'))
-        .map((path) => path.getAttribute('d') || '')
-        .join(' ');
-
-      return /M4 19a3 3 0 0 1 3-3h4\.15/.test(pathData) && /M37\.43 37\.44/.test(pathData);
-    });
-
-    if (speakerIcon) {
-      return findClickableAncestor(speakerIcon);
-    }
-
-    const icon = doc.querySelector(
-      'svg[class*="sound"], svg[class*="volume"], svg[data-e2e*="sound"], svg[data-e2e*="mute"]',
-    );
-    if (icon) {
-      return findClickableAncestor(icon);
-    }
-
-    return null;
-  }
-
-  function findClickableAncestor(node) {
-    let current = node;
-
-    while (current && current.nodeType === Node.ELEMENT_NODE) {
-      const label = (current.getAttribute('aria-label') || current.getAttribute('title') || '').toLowerCase();
-      if (
-        current.matches?.('button, [role="button"], [tabindex], [data-e2e], .cursor-pointer') ||
-        current.getAttribute('onclick') ||
-        /unmute|sound on|turn on sound|enable sound|volume|speaker|ligar som|ativar som/.test(label)
-      ) {
-        return current;
-      }
-
-      current = current.parentElement;
-    }
-
-    return node.parentElement || node;
-  }
-
-  function dispatchSoundActivationSequence(target, doc = document) {
-    if (!target || typeof target.dispatchEvent !== 'function') {
-      return false;
-    }
-
-    const view = doc.defaultView || window;
-    const rect = typeof target.getBoundingClientRect === 'function' ? target.getBoundingClientRect() : null;
-    const clientX = rect && Number.isFinite(rect.left) ? Math.round(rect.left + rect.width / 2) : 0;
-    const clientY = rect && Number.isFinite(rect.top) ? Math.round(rect.top + rect.height / 2) : 0;
-    const pointerInit = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view,
-      clientX,
-      clientY,
-      button: 0,
-      buttons: 1,
-    };
-    const mouseDownInit = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view,
-      clientX,
-      clientY,
-      button: 0,
-      buttons: 1,
-    };
-    const mouseUpInit = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view,
-      clientX,
-      clientY,
-      button: 0,
-      buttons: 0,
-    };
-
-    try {
-      if (typeof PointerEvent === 'function') {
-        target.dispatchEvent(new PointerEvent('pointerdown', { ...pointerInit, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
-        target.dispatchEvent(new PointerEvent('pointerup', { ...pointerInit, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 0 }));
-      }
-    } catch (err) {
-      // Ignore PointerEvent constructor limitations and keep trying the mouse path.
-    }
-
-    try {
-      target.dispatchEvent(new MouseEvent('mousedown', mouseDownInit));
-      target.dispatchEvent(new MouseEvent('mouseup', mouseUpInit));
-      target.dispatchEvent(new MouseEvent('click', { ...mouseUpInit, buttons: 0 }));
-    } catch (err) {
-      // Ignore synthetic mouse failures and fall back to the native click helper.
-    }
-
-    try {
-      if (typeof target.click === 'function') {
-        target.click();
-      }
-    } catch (err) {
-      // Ignore native click failures.
-    }
-
-    return true;
-  }
-
-  function createMuteShortcutEvent(doc) {
-    const event = new KeyboardEvent('keydown', {
-      key: 'm',
-      code: 'KeyM',
-      keyCode: 77,
-      which: 77,
-      charCode: 0,
-      location: 0,
-      repeat: false,
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view: doc.defaultView || window,
-    });
-
-    try {
-      Object.defineProperties(event, {
-        keyCode: { get: () => 77 },
-        which: { get: () => 77 },
-        charCode: { get: () => 0 },
-      });
-    } catch (err) {
-      // Ignore if the browser refuses to redefine legacy key fields.
-    }
-
-    return event;
-  }
-
-  function dispatchMuteShortcut(doc = document) {
-    const target = doc.body || doc.documentElement || doc;
-    if (!target || typeof target.dispatchEvent !== 'function') {
-      return false;
-    }
-
-    try {
-      target.dispatchEvent(createMuteShortcutEvent(doc));
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function stopSoundBootstrap() {
-    soundBootstrapActive = false;
-
-    if (soundBootstrapInterval) {
-      window.clearInterval(soundBootstrapInterval);
-      soundBootstrapInterval = null;
-    }
-
-    if (soundBootstrapObserver) {
-      soundBootstrapObserver.disconnect();
-      soundBootstrapObserver = null;
-    }
-  }
-
-  function attemptSoundActivation() {
-    if (soundBootstrapDone) {
-      return true;
-    }
-
-    const snapshot = collectSoundBootstrapSnapshot();
-    soundBootstrapState.attempts += 1;
-    renderBootState(snapshot);
-
-    const phaseInfo = describeBootPhase(snapshot);
-    renderBootState({
-      ...snapshot,
-      ...phaseInfo,
-      attempts: soundBootstrapState.attempts,
-    });
-
-    if (snapshot.readyDocs === 0 || snapshot.mutedDocs === 0) {
-      if (snapshot.mutedDocs === 0 && snapshot.readyDocs > 0) {
-        soundBootstrapDone = true;
-        stopSoundBootstrap();
-      }
-      return snapshot.mutedDocs === 0;
-    }
-
-    const attempted = activateSoundFromSnapshot(snapshot);
-    const afterSnapshot = collectSoundBootstrapSnapshot();
-    const afterPhase = describeBootPhase(afterSnapshot);
-
-    renderBootState({
-      ...afterSnapshot,
-      ...afterPhase,
-      attempts: soundBootstrapState.attempts,
-    });
-
-    if (afterSnapshot.mutedDocs === 0) {
-      soundBootstrapDone = true;
-      stopSoundBootstrap();
-      return true;
-    }
-
-    return attempted;
-  }
-
-  function activateSound() {
-    return activateSoundFromSnapshot(collectSoundBootstrapSnapshot());
-  }
-
-  function activateSoundAtStartup() {
-    if (soundBootstrapActive || soundBootstrapDone) {
-      attemptSoundActivation();
-      return;
-    }
-
-    soundBootstrapActive = true;
-    const startTime = Date.now();
-    const maxWait = 60000;
-    const initialSnapshot = collectSoundBootstrapSnapshot();
-    renderBootState({
-      ...initialSnapshot,
-      ...describeBootPhase(initialSnapshot),
-      attempts: soundBootstrapState.attempts,
-    });
-
-    attemptSoundActivation();
-
-    soundBootstrapInterval = window.setInterval(() => {
-      if (soundBootstrapDone) {
-        stopSoundBootstrap();
-        return;
-      }
-
-      if (Date.now() - startTime >= maxWait) {
-        const failedSnapshot = collectSoundBootstrapSnapshot();
-        renderBootState({
-          ...failedSnapshot,
-          phase: 'failed',
-          detail: 'Sound bootstrap timed out',
-          attempts: soundBootstrapState.attempts,
-          failed: true,
-        });
-        soundBootstrapState.failed = true;
-        stopSoundBootstrap();
-        return;
-      }
-
-      attemptSoundActivation();
-    }, 750);
-
-    if (typeof MutationObserver === 'function' && document.documentElement) {
-      soundBootstrapObserver = new MutationObserver(() => {
-        attemptSoundActivation();
-      });
-
-      soundBootstrapObserver.observe(document.documentElement, {
-        attributes: true,
-        childList: true,
-        subtree: true,
-      });
-    }
-
-    ['readystatechange', 'loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'play', 'playing', 'volumechange'].forEach((eventName) => {
-      document.addEventListener(eventName, attemptSoundActivation, true);
-    });
-
-    document.addEventListener('visibilitychange', attemptSoundActivation, true);
-    window.addEventListener('focus', attemptSoundActivation, true);
-    window.addEventListener('load', attemptSoundActivation, true);
   }
 
   function applySavedPosition() {
@@ -1306,8 +735,6 @@
       return;
     }
 
-    activateSoundAtStartup();
-
     const value = clampFloat(valueInput.value, 1, 1000000);
     state.count = 0;
     state.accumulatedElapsedMs = 0;
@@ -1366,7 +793,6 @@
       window.clearInterval(state.statsTimer);
       state.statsTimer = null;
     }
-    stopSoundBootstrap();
     setStatus(nextStatus);
     persistRuntimeState();
   }
